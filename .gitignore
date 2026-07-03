@@ -2,3 +2,10 @@
 __pycache__/
 *.pyc
 .venv/
+
+# Frontend (React/Vite)
+node_modules/
+dist/
+dist-ssr/
+*.local
+npm-debug.log*

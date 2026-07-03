@@ -85,7 +85,7 @@ def import_artist(mbid: str):
 
             time.sleep(0.1)
 
-        # 3. Releases → labels
+        # 3. Releases → labels, et lien recording -> release (via les pistes de la release)
         releases = mb.get_artist_releases(mbid, limit=25)
         for release in releases:
             db.upsert_release(release)
@@ -93,6 +93,13 @@ def import_artist(mbid: str):
                 label = label_info.get("label")
                 if label and label.get("id"):
                     db.upsert_label(label, release["id"])
+
+            for medium in release.get("media", []):
+                for track in medium.get("tracks", []):
+                    track_recording = track.get("recording")
+                    if track_recording and track_recording.get("id"):
+                        db.link_recording_release(track_recording["id"], release["id"])
+
             time.sleep(0.1)
 
         return {
@@ -109,6 +116,12 @@ def import_artist(mbid: str):
 # ------------------------------------------------------------------
 # Lecture depuis Neo4j
 # ------------------------------------------------------------------
+
+@app.get("/api/artists")
+def list_artists():
+    """Liste les artistes déjà importés dans Neo4j (utilisé par la recherche du frontend)."""
+    return {"artists": db.get_all_artists()}
+
 
 @app.get("/api/artists/{mbid}/recordings")
 def get_recordings(mbid: str):
@@ -146,6 +159,12 @@ def top_genres(limit: int = 10):
 @app.get("/api/graph")
 def get_graph():
     return db.get_full_graph()
+
+
+@app.get("/api/graph/collaborations")
+def get_collaboration_graph():
+    """Réseau artiste <-> collaborations uniquement, utilisé par la visualisation graphe du frontend."""
+    return db.get_collaboration_graph()
 
 
 @app.get("/health")

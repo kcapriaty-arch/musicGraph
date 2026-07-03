@@ -30,20 +30,28 @@ def get_artist_recordings(mbid: str, limit: int = 50) -> list:
     Récupère les enregistrements d'un artiste.
     'artist-credits' contient les autres artistes présents sur le titre
     -> c'est ce qui nous permet de détecter les collaborations et featurings.
+
+    Note : MusicBrainz n'autorise pas 'releases' comme inc sur ce endpoint
+    (browse de recordings par artiste) -> le lien recording/release est
+    reconstruit depuis get_artist_releases (inc=recordings) à la place.
     """
     data = _get("recording", {
         "artist": mbid,
-        "inc": "artist-credits+releases",
+        "inc": "artist-credits",
         "limit": limit,
     })
     return data.get("recordings", [])
 
 
 def get_artist_releases(mbid: str, limit: int = 25) -> list:
-    """Récupère les albums/singles d'un artiste avec les labels associés."""
+    """
+    Récupère les albums/singles d'un artiste avec les labels associés.
+    'recordings' inclut les pistes (media/tracks/recording) de chaque release,
+    ce qui permet de relier les recordings déjà importés à leur release.
+    """
     data = _get("release", {
         "artist": mbid,
-        "inc": "labels",
+        "inc": "labels+recordings",
         "limit": limit,
     })
     return data.get("releases", [])

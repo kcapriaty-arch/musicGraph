@@ -270,3 +270,45 @@ class Neo4jClient:
                         }
                     edges.append({"from": n_id, "to": m_id, "type": record["r"].type})
             return {"nodes": list(nodes.values()), "edges": edges}
+
+    def get_all_artists(self) -> list:
+        """Liste les artistes déjà importés dans Neo4j (pour la recherche côté frontend)."""
+        with self.driver.session() as session:
+            result = session.run(
+                """
+                MATCH (a:Artist)
+                OPTIONAL MATCH (a)-[:COLLABORATED_WITH]-(b:Artist)
+                RETURN a.mbid AS mbid, a.name AS name, a.country AS country,
+                       a.type AS type, COUNT(DISTINCT b) AS connections
+                ORDER BY a.name
+                """
+            )
+            return [dict(r) for r in result]
+
+    def get_collaboration_graph(self) -> dict:
+        """
+        Retourne uniquement les artistes et leurs collaborations (contrairement à
+        get_full_graph, pas de Recording/Release/Genre/Label). Évite le LIMIT
+        arbitraire de get_full_graph, qui pouvait couper la requête avant d'avoir
+        parcouru tous les artistes sur une base de données un peu grande.
+        """
+        with self.driver.session() as session:
+            artist_rows = session.run("MATCH (a:Artist) RETURN a.mbid AS mbid, a.name AS name")
+            nodes = [
+                {"id": row["mbid"], "label": "Artist", "name": row["name"], "properties": {}}
+                for row in artist_rows
+            ]
+
+            collab_rows = session.run(
+                """
+                MATCH (a:Artist)-[:COLLABORATED_WITH]-(b:Artist)
+                WHERE a.mbid < b.mbid
+                RETURN DISTINCT a.mbid AS from_mbid, b.mbid AS to_mbid
+                """
+            )
+            edges = [
+                {"from": row["from_mbid"], "to": row["to_mbid"], "type": "COLLABORATED_WITH"}
+                for row in collab_rows
+            ]
+
+            return {"nodes": nodes, "edges": edges}
